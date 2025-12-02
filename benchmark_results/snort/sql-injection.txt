@@ -1,0 +1,10 @@
+=============================
+     RESULTADO DO ATAQUE 5
+=============================
+Latência: 4s
+Pico CPU: 18%
+Pico RAM: 1238 MB
+Log inicial: 53558634 bytes
+
+Início: 20:09:54
+Detecção: 20:09:58
