@@ -43,19 +43,13 @@ O sistema utiliza as seguintes tecnologias e ferramentas:
 * **Ferramentas de Auditoria e Ataque:**
     * Foi utilizado o comando `Docker stats` para monitorar o consumo da maquina Docker dos IDs.
 
-## Resultados Experimentais
+## Resultados Obtidos
 
 Os resultados detalhados encontram-se no diretório `benchmark_results` e incluem:
 * Logs de alertas gerados por cada ferramenta.
 * Tabelas de eficácia de detecção (Positivo/Negativo) para cada vetor.
 
 A análise foca na viabilidade de execução simultânea das ferramentas no hardware físico e na comparação com os dados prévios obtidos em ambiente emulado.
-
-## Como Executar
-
-Instruções para reprodução dos experimentos:
-
-1. TODO
 
 ## Referências Bibliográficas
 
