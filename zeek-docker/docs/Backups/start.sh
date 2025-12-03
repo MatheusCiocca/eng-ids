@@ -1,10 +1,9 @@
 #!/bin/bash
-set -e
 
-# ============================================================================
 # Script de Inicialização do SIMIR - Modo Interativo
-# Adiciona verificação e instalação automática do Docker e Docker Compose
-# ============================================================================
+# Suporta dois modos: Interface Física ou Rede Docker
+
+set -e
 
 # Detecta diretório do script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,81 +23,7 @@ log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# ============================================================================
-# 1. Verificar e instalar Docker e Docker Compose (se necessário)
-# ============================================================================
-log_info "Verificando instalação do Docker..."
-
-if ! command -v docker >/dev/null 2>&1; then
-    log_warning "Docker não encontrado. Deseja instalar agora? (requer sudo)"
-    read -p "Instalar Docker e Docker Compose? [S/n]: " INSTALL_DOCKER
-    if [[ "$INSTALL_DOCKER" =~ ^[Nn]$ ]]; then
-        log_error "Docker é necessário para rodar o SIMIR. Abortando."
-        exit 1
-    fi
-
-    log_info "Instalando Docker e Docker Compose..."
-
-    # Remover versões antigas (caso existam)
-    sudo apt-get remove -y docker docker-engine docker.io containerd runc >/dev/null 2>&1 || true
-
-    # Atualizar repositórios
-    sudo apt-get update -y >/dev/null
-
-    # Instalar pacotes necessários
-    sudo apt-get install -y ca-certificates curl gnupg lsb-release >/dev/null
-
-    # Adicionar chave GPG oficial
-    sudo mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-    # Adicionar repositório Docker
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-      https://download.docker.com/linux/ubuntu \
-      $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
-
-    # Atualizar pacotes e instalar Docker
-    sudo apt-get update -y >/dev/null
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null
-
-    log_success "Docker e Docker Compose instalados com sucesso!"
-
-    # Ativar serviço
-    sudo systemctl enable docker >/dev/null
-    sudo systemctl start docker >/dev/null
-else
-    log_success "Docker já está instalado."
-fi
-
-# Verifica se o usuário pode usar Docker sem sudo
-if ! groups "$USER" | grep -q '\bdocker\b'; then
-    log_warning "Usuário atual não está no grupo 'docker'."
-    echo "Adicionando usuário '$USER' ao grupo docker..."
-    sudo usermod -aG docker "$USER"
-    log_info "Você precisará sair e entrar novamente na sessão para aplicar a permissão."
-    echo
-    read -p "Deseja continuar mesmo assim (pode exigir sudo)? [S/n]: " CONTINUE
-    if [[ "$CONTINUE" =~ ^[Nn]$ ]]; then
-        exit 1
-    fi
-fi
-
-# ============================================================================
-# 2. Detectar comando docker-compose moderno ou legado
-# ============================================================================
-if docker compose version >/dev/null 2>&1; then
-    COMPOSE_CMD="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-    COMPOSE_CMD="docker-compose"
-else
-    log_error "Nem 'docker compose' nem 'docker-compose' foram encontrados após a instalação."
-    exit 1
-fi
-
-# ============================================================================
-# 3. Banner e inicialização do sistema
-# ============================================================================
+# Banner
 clear
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║                                                                ║${NC}"
@@ -157,14 +82,14 @@ cleanup_environment() {
     log_info "Limpando ambiente anterior..."
     
     # Parar SIMIR se estiver rodando
-    if docker ps -a --format '{{.Names}}' | grep -q "^SIMIR_Z$"; then
+    if docker ps -a | grep -q SIMIR_Z; then
         log_info "Parando container SIMIR_Z..."
         docker stop SIMIR_Z 2>/dev/null || true
         docker rm SIMIR_Z 2>/dev/null || true
     fi
     
     # Parar target server se estiver rodando
-    if docker ps -a --format '{{.Names}}' | grep -q "^SIMIR_TARGET$"; then
+    if docker ps -a | grep -q SIMIR_TARGET; then
         log_info "Parando container SIMIR_TARGET..."
         docker stop SIMIR_TARGET 2>/dev/null || true
         docker rm SIMIR_TARGET 2>/dev/null || true
@@ -172,7 +97,7 @@ cleanup_environment() {
     
     # Parar containers de ataque
     for container in dos-http brute-force-ssh ping-flood dns-tunneling sql-injection; do
-        if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
+        if docker ps -a | grep -q "$container"; then
             docker stop "$container" 2>/dev/null || true
             docker rm "$container" 2>/dev/null || true
         fi
@@ -229,17 +154,17 @@ if [ "$MODE" = "physical" ]; then
     
     # Construir e iniciar
     log_info "Construindo imagem Docker..."
-    $COMPOSE_CMD build --quiet
+    docker-compose build --quiet
     
     log_info "Iniciando SIMIR..."
-    $COMPOSE_CMD up -d
+    docker-compose up -d
     
     # Aguardar inicialização
     log_info "Aguardando inicialização do Zeek..."
     sleep 15
     
     # Verificar status
-    if docker ps --format '{{.Names}}' | grep -q "^SIMIR_Z$"; then
+    if docker ps | grep -q SIMIR_Z; then
         log_success "SIMIR iniciado com sucesso!"
         echo
         log_info "Configuração:"
@@ -267,38 +192,8 @@ elif [ "$MODE" = "docker" ]; then
     log_info "Configurando modo Rede Docker..."
     
     # Verificar se rede simir-net existe
-    if ! docker network ls --format '{{.Name}}' | grep -q "^simir-net$"; then
+    if ! docker network ls | grep -q simir-net; then
         log_info "Criando rede Docker simir-net..."
-        
-        # Verificar se existe conflito no range 172.18.0.0/16
-        if docker network inspect $(docker network ls -q) 2>/dev/null | grep -q "172.18.0.0/16"; then
-            # Encontrar qual rede está usando esse range
-            CONFLICTING_NETWORK=$(docker network ls --format "{{.Name}}" | while read net; do
-                if docker network inspect "$net" 2>/dev/null | grep -q "172.18.0.0/16"; then
-                    echo "$net"
-                    break
-                fi
-            done)
-            
-            if [ ! -z "$CONFLICTING_NETWORK" ]; then
-                log_warning "Rede '$CONFLICTING_NETWORK' está usando o range 172.18.0.0/16"
-                
-                # Verificar se tem containers
-                if docker network inspect "$CONFLICTING_NETWORK" | grep -q '"Containers": {}'; then
-                    log_info "Removendo rede não utilizada '$CONFLICTING_NETWORK'..."
-                    docker network rm "$CONFLICTING_NETWORK" 2>/dev/null || {
-                        log_error "Não foi possível remover a rede '$CONFLICTING_NETWORK'"
-                        log_error "Remova manualmente com: docker network rm $CONFLICTING_NETWORK"
-                        exit 1
-                    }
-                else
-                    log_error "A rede '$CONFLICTING_NETWORK' possui containers ativos."
-                    log_error "Pare os containers que usam essa rede primeiro."
-                    exit 1
-                fi
-            fi
-        fi
-        
         docker network create \
             --driver bridge \
             --subnet 172.18.0.0/16 \
@@ -324,10 +219,10 @@ elif [ "$MODE" = "docker" ]; then
     fi
     
     log_info "Construindo imagem Docker..."
-    $COMPOSE_CMD -f docker-compose.yml.docker-net build --quiet
+    docker-compose -f docker-compose.yml.docker-net build --quiet
     
     log_info "Iniciando SIMIR (monitorando br-simir)..."
-    $COMPOSE_CMD -f docker-compose.yml.docker-net up -d
+    docker-compose -f docker-compose.yml.docker-net up -d
     
     # Aguardar SIMIR inicializar
     log_info "Aguardando inicialização do Zeek..."
@@ -338,12 +233,12 @@ elif [ "$MODE" = "docker" ]; then
     cd ataques_docker
     
     # Verificar se imagem do target existe
-    if ! docker images --format '{{.Repository}}' | grep -q "^simir-target$"; then
+    if ! docker images | grep -q simir-target; then
         log_info "Construindo imagem do target server..."
         docker build -t simir-target -f target-server/Dockerfile target-server/ --quiet
     fi
     
-    $COMPOSE_CMD -f docker-compose-target-net.yml up -d
+    docker-compose -f docker-compose-target-net.yml up -d
     
     # Aguardar target inicializar
     sleep 5
@@ -370,7 +265,7 @@ EOF
     cd "$SCRIPT_DIR"
     
     # Verificar status
-    if docker ps --format '{{.Names}}' | grep -q "^SIMIR_Z$" && docker ps --format '{{.Names}}' | grep -q "^SIMIR_TARGET$"; then
+    if docker ps | grep -q SIMIR_Z && docker ps | grep -q SIMIR_TARGET; then
         log_success "Ambiente Docker configurado com sucesso!"
         echo
         log_info "Configuração:"
@@ -403,10 +298,10 @@ EOF
         log_error "Falha ao iniciar ambiente Docker"
         echo
         log_info "Status dos containers:"
-        docker ps -a | grep -E "SIMIR_Z|SIMIR_TARGET" || true
+        docker ps -a | grep -E "SIMIR_Z|SIMIR_TARGET"
         echo
         log_info "Logs do SIMIR:"
-        docker logs SIMIR_Z 2>&1 | tail -20 || true
+        docker logs SIMIR_Z 2>&1 | tail -20
         exit 1
     fi
 fi
