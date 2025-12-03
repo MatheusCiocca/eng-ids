@@ -1,0 +1,10 @@
+===========================================
+     RESULTADO DO ATAQUE SQL Injection
+===========================================
+Latência: 5s
+Pico CPU: 14.58%
+Pico RAM: 1098 MB
+Log inicial: 2651 bytes
+
+Início: 15:54:14
+Detecção: 15:54:19

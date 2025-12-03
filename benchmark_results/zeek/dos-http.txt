@@ -1,0 +1,10 @@
+======================================
+     RESULTADO DO ATAQUE DoS HTTP
+======================================
+Latência: 17s
+Pico CPU: 97.99%
+Pico RAM: 1215 MB
+Log inicial: 189 bytes
+
+Início: 16:06:56
+Detecção: 16:07:13

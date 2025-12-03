@@ -1,0 +1,10 @@
+===========================================
+     RESULTADO DO ATAQUE DNS Tunneling
+===========================================
+Latência: 2s
+Pico CPU: 2.53%
+Pico RAM: 1095 MB
+Log inicial: 866 bytes
+
+Início: 15:51:04
+Detecção: 15:51:06

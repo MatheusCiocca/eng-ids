@@ -1,0 +1,10 @@
+=========================================
+     RESULTADO DO ATAQUE Brute Force
+=========================================
+Latência: 3s
+Pico CPU: 60.95%
+Pico RAM: 1261 MB
+Log inicial: 189 bytes
+
+Início: 15:49:03
+Detecção: 15:49:06

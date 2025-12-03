@@ -1,0 +1,10 @@
+========================================
+     RESULTADO DO ATAQUE Ping Flood
+========================================
+Latência: 99s
+Pico CPU: 4.82%
+Pico RAM: 1157 MB
+Log inicial: 4083 bytes
+
+Início: 15:56:53
+Detecção: 15:58:32
