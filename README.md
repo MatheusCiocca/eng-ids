@@ -41,7 +41,7 @@ O sistema utiliza as seguintes tecnologias e ferramentas:
     * Snort (Detecção baseada em assinatura).
     * Suricata (Detecção baseada em assinatura com multithreading).
 * **Ferramentas de Auditoria e Ataque:**
-    *     Foi utilizado o comando `mpstat` para monitorar o uso de CPU e o comando `free` para monitorar o consumo de memória RAM durante os testes de benchmark dos IDSs.
+    * Foi utilizado o comando `mpstat` para monitorar o uso de CPU e o comando `free` para monitorar o consumo de memória RAM durante os testes de benchmark dos IDSs.
 
 ## Resultados Obtidos
 
